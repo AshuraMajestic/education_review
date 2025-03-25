@@ -1,0 +1,121 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Enum for user types
+enum UserType {
+  ADMIN
+  STUDENT
+  TEACHER
+}
+
+// Base User model
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  userType  UserType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  student   Student?
+  teacher   Teacher?
+}
+
+// Student Model
+model Student {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  
+  // Optional username (can be shared among students)
+  username       String?
+  name           String
+  enrollmentNumber String  @unique
+
+  // Relationships
+  comments       TeacherComment[]
+  commentLikes   TeacherCommentLike[]
+  teacherLikes   TeacherLike[]
+}
+
+// Teacher Model
+model Teacher {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  
+  teacherId      String?  @unique
+  name           String
+  qualification  String
+  
+  // Aggregated rating fields
+  totalRating    Float    @default(0)
+  ratingCount    Int      @default(0)
+  averageRating  Float    @default(0)
+  
+  // Likes tracking
+  totalLikes     Int      @default(0)
+
+  // Relationships
+  comments       TeacherComment[]
+  likes          TeacherLike[]
+}
+
+// Teacher Comment Model (for anonymous feedback)
+model TeacherComment {
+  id             String   @id @default(cuid())
+  content        String
+  
+  // Anonymous feedback fields
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  
+  teacherId      String
+  teacher        Teacher  @relation(fields: [teacherId], references: [id])
+  
+  // Feedback specifics
+  teachingBehavior Int?    // Rating from 1-5
+  classTaking      Int?    // Rating from 1-5
+  
+  createdAt       DateTime @default(now())
+  
+  // Likes on the comment
+  likes           TeacherCommentLike[]
+}
+
+// Likes Model for Comments
+model TeacherCommentLike {
+  id             String   @id @default(cuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  
+  commentId      String
+  comment        TeacherComment @relation(fields: [commentId], references: [id])
+  
+  createdAt      DateTime @default(now())
+
+  // Ensure unique like per student per comment
+  @@unique([studentId, commentId])
+}
+
+// Teacher Likes Model
+model TeacherLike {
+  id             String   @id @default(cuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id])
+  
+  teacherId      String
+  teacher        Teacher  @relation(fields: [teacherId], references: [id])
+  
+  createdAt      DateTime @default(now())
+
+  // Ensure unique like per student per teacher
+  @@unique([studentId, teacherId])
+}
